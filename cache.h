@@ -10,6 +10,12 @@
 #define DEFAULT_CACHE_WRITEALLOC TRUE
 #define DEFAULT_NUM_CORE 2
 
+
+#define INVALID 0
+#define EXCLUSIVE 1
+#define SHARED 2
+#define MODIFIED 3
+
 /* constants for settting cache parameters */
 #define NUM_CORE 0
 #define CACHE_PARAM_BLOCK_SIZE 1
@@ -45,6 +51,8 @@ typedef struct cache_stat_ {
 /* function prototypes */
 void set_cache_param();
 void init_cache();
+// Pcache_line findInOtherCores(unsigned tag, int pid);
+// void invalidate_copies(unsigned tag, int pid);
 void perform_access();
 void flush();
 void delete();

@@ -1,3 +1,5 @@
+/* Ibrahim Khan */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,6 +15,9 @@ static int words_per_block = DEFAULT_CACHE_BLOCK_SIZE / WORD_SIZE;
 static int cache_writeback = DEFAULT_CACHE_WRITEBACK;
 static int cache_writealloc = DEFAULT_CACHE_WRITEALLOC;
 static int num_core = DEFAULT_NUM_CORE;
+static int hits = 0;
+static int s_miss = 0;
+static int l_miss = 0;
 
 /* cache model data structures */
 /* max of 8 cores */
@@ -48,45 +53,209 @@ void init_cache()
   int i;
 
   /* initialize the cache, and cache statistics data structures */
-  for(i = 0; i < num_core; i++)
-  {
- }
+  for(i = 0; i < num_core; i++){
+    mesi_cache[i].id = i;
+    mesi_cache[i].size = cache_usize;
+    mesi_cache[i].LRU_head = (Pcache_line)malloc(sizeof(cache_line));
+    mesi_cache[i].LRU_tail = (Pcache_line)malloc(sizeof(cache_line));
+    mesi_cache[i].LRU_head = NULL;
+		mesi_cache[i].LRU_tail = NULL;
+    mesi_cache[i].cache_contents = cache_usize/cache_block_size;
+  }
+}
+
+void invalidate_copies(unsigned tag, unsigned pid){
+  int i;
+	Pcache_line temp_head, temp_del;
+  Pcache c;
+
+  for(i=0;i<num_core;i++){
+    if (i != pid){
+      c = &mesi_cache[i];
+      temp_head = c->LRU_head;
+      while(temp_head != NULL){
+        if(temp_head->tag == tag){
+          delete(&(c->LRU_head), &(c->LRU_tail), temp_head, i);
+          break;
+        }
+        temp_head = temp_head->LRU_next;
+	    }
+    }
+  }
 }
 /************************************************************/
 
-/************************************************************/
+Pcache_line findOtherCores(unsigned tag, unsigned pid){
+  int i;
+
+  for (i = 0; i < num_core; i++){
+    if (i != pid){
+      Pcache_line temp;
+      int found = 0;
+      temp = mesi_cache[i].LRU_head;
+      while(temp != NULL && found == 0){
+        if(temp->tag == tag){
+          found = 1;
+          return temp;    
+        }
+        temp = temp->LRU_next;
+      }
+    }
+  }
+  return NULL;
+}
+
 void perform_access(addr, access_type, pid)
      unsigned addr, access_type, pid;
 {
-  int i, idx;
-  Pcache c;
+  int i, idx, hit = 0, hitOtherCache;
+  unsigned tag = addr;
+  Pcache c = &mesi_cache[pid];
+  
+  Pcache_line temp_head, temp_line, temp_tail, check_line, check_line2;
 
-  /* handle accesses to the mesi caches */
+  mesi_cache_stat[pid].accesses++;
+  tag = (addr) >> LOG2(cache_block_size);
+
+  
+  // idx = (addr) >> LOG2(sizeof(addr));
   switch(access_type)
-  {
+  { 
+    case TRACE_STORE: 
+      if(c->LRU_head != NULL){
+        temp_head = c->LRU_head;
+      }else{
+        temp_head = NULL;
+      }
+
+      while(temp_head != NULL && hit == 0){
+				if(temp_head->tag == tag){
+          if (temp_head->state != INVALID){
+            hit = 1;
+          }
+        }else{
+          temp_head = temp_head->LRU_next;
+        }
+			}
+
+      if(hit){ // write hit
+        if (temp_head->state == SHARED){
+          mesi_cache_stat[pid].broadcasts++;
+          invalidate_copies(tag, pid);
+        }
+
+        temp_head->state = MODIFIED;
+        delete(&(c->LRU_head), &(c->LRU_tail), temp_head, pid);
+        insert(&(c->LRU_head), &(c->LRU_tail), temp_head, pid);
+
+
+      }else{// write miss
+        temp_line = (Pcache_line)malloc(sizeof(cache_line));
+        temp_line->tag = tag;
+        temp_line->LRU_next = NULL;
+        temp_line->LRU_prev = NULL;
+        mesi_cache_stat[pid].misses++;
+        mesi_cache_stat[pid].broadcasts++;
+        mesi_cache_stat[pid].demand_fetches++;
+
+        check_line2 = findOtherCores(tag, pid);
+
+        if(check_line2 != NULL){
+          invalidate_copies(tag,pid);
+        }
+
+        if (c->cache_contents == 0){ //full
+          temp_tail = c->LRU_tail;
+          if (temp_tail->state == MODIFIED){
+            mesi_cache_stat[pid].copies_back += words_per_block;
+          }
+          delete(&(c->LRU_head), &(c->LRU_tail), temp_tail, pid);
+        }
+        temp_line->state = MODIFIED;
+        insert(&(c->LRU_head), &(c->LRU_tail), temp_line, pid);
+        
+      }
+
+      break;
     case TRACE_LOAD:
-      perform_access_load(addr, pid);
+      if(c->LRU_head != NULL){
+        temp_head = c->LRU_head;
+      }else{
+        temp_head = NULL;
+      }
+
+      while(temp_head != NULL && hit == 0){
+				if(temp_head->tag == tag){
+          hit = 1;
+        }else{
+          temp_head = temp_head->LRU_next;
+        }
+			}
+      if (hit == 1){ //read hit
+        delete(&(c->LRU_head), &(c->LRU_tail), temp_head, pid);
+				insert(&(c->LRU_head), &(c->LRU_tail), temp_head, pid);
+      }else{ //read miss
+        mesi_cache_stat[pid].misses++;
+				mesi_cache_stat[pid].broadcasts++;
+        temp_line = (Pcache_line)malloc(sizeof(cache_line));
+        temp_line->tag = tag;
+        temp_line->LRU_next = NULL;
+        temp_line->LRU_prev = NULL;
+        mesi_cache_stat[pid].demand_fetches++;
+        
+        check_line = findOtherCores(tag,pid);
+
+        if (check_line == NULL){ //no other cache has it
+          temp_line->state = EXCLUSIVE;
+        }else{
+          if(check_line->state == MODIFIED){
+            mesi_cache_stat[pid].copies_back += words_per_block;
+          }
+          temp_line->state = SHARED;
+          check_line->state = SHARED;
+        }
+
+        if (c->cache_contents == 0){ //full
+          temp_tail = c->LRU_tail;
+          if (temp_tail->state == MODIFIED){
+            mesi_cache_stat[pid].copies_back += words_per_block;
+          }
+          delete(&(c->LRU_head), &(c->LRU_tail), temp_tail, pid);
+        }
+        insert(&(c->LRU_head), &(c->LRU_tail), temp_line, pid);
+      }
       break;
-    case TRACE_STORE:
-      perform_access_store(addr, pid);
-      break;
+      free(temp_line);
   }
 
 }
 /************************************************************/
 
 /************************************************************/
-void flush()
-{
-  /* flush the mesi caches */
+
+void flush(){
+  int i;
+	Pcache_line temp_head, temp_del;
+	temp_head = (Pcache_line)malloc(sizeof(cache_line));
+  for(i=0;i<num_core;i++){
+    temp_head = mesi_cache[i].LRU_head;
+    while(temp_head != NULL){
+      if(temp_head->state == MODIFIED){
+        delete(&(mesi_cache[i].LRU_head), &(mesi_cache[i].LRU_head), temp_head, i);
+        mesi_cache_stat[i].copies_back += words_per_block;
+      }
+      temp_head = temp_head->LRU_next;
+	  }
+  }
 }
 /************************************************************/
 
 /************************************************************/
-void delete(head, tail, item)
+void delete(head, tail, item, pid)
   Pcache_line *head, *tail;
   Pcache_line item;
 {
+  mesi_cache[pid].cache_contents++;
   if (item->LRU_prev) {
     item->LRU_prev->LRU_next = item->LRU_next;
   } else {
@@ -105,10 +274,11 @@ void delete(head, tail, item)
 
 /************************************************************/
 /* inserts at the head of the list */
-void insert(head, tail, item)
+void insert(head, tail, item, pid)
   Pcache_line *head, *tail;
   Pcache_line item;
 {
+  mesi_cache[pid].cache_contents--;
   item->LRU_next = *head;
   item->LRU_prev = (Pcache_line)NULL;
 
@@ -131,6 +301,29 @@ void dump_settings()
 /************************************************************/
 
 /************************************************************/
+
+void print_final_output(){
+    FILE *fp;
+    int i, demand_fetches = 0, copies_back = 0, broadcasts = 0;
+    fp = fopen("./final_output.txt", "a");
+    fprintf(fp, "\nNumber of Cores: %d\tCache Size: %d\tBlock Size: %d\n", num_core,cache_usize,cache_block_size);
+      for (i = 0; i < num_core; i++) {
+        fprintf(fp, "  CORE %d\n", i);
+        fprintf(fp,"  accesses:  %d\n", mesi_cache_stat[i].accesses);
+        fprintf(fp, "  misses:    %d\n\n", mesi_cache_stat[i].misses);
+        demand_fetches += mesi_cache_stat[i].demand_fetches;
+        copies_back += mesi_cache_stat[i].copies_back;
+        broadcasts += mesi_cache_stat[i].broadcasts;
+      }
+    fprintf(fp, "  demand fetch (words): %d\n", (demand_fetches)*cache_block_size/WORD_SIZE);
+    fprintf(fp, "  broadcasts:           %d\n", broadcasts);
+    fprintf(fp, "  copies back (words):  %d\n\n", copies_back);
+
+    fclose(fp);
+
+
+}
+
 void print_stats()
 {
   int i;
@@ -161,6 +354,9 @@ void print_stats()
   /* number of broadcasts */
   printf("  broadcasts:           %d\n", broadcasts);
   printf("  copies back (words):  %d\n", copies_back);
+
+  print_final_output();
+
 }
 /************************************************************/
 
@@ -175,10 +371,4 @@ void init_stat(Pcache_stat stat)
   stat->broadcasts = 0;
 }
 /************************************************************/
-void perform_access_store(int addr, int i)
-{
-}
 
-void perform_access_load(int addr, int i)
-{
-}

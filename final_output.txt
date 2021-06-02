@@ -1,0 +1,156 @@
+
+Number of Cores: 1	Cache Size: 8192	Block Size: 16
+  CORE 0
+  accesses:  1000001
+  misses:    25966
+
+  demand fetch (words): 103864
+  broadcasts:           25966
+  copies back (words):  8472
+
+
+Number of Cores: 2	Cache Size: 8192	Block Size: 16
+  CORE 0
+  accesses:  3465000
+  misses:    481255
+
+  CORE 1
+  accesses:  3464832
+  misses:    294136
+
+  demand fetch (words): 3101564
+  broadcasts:           1089493
+  copies back (words):  2468364
+
+
+Number of Cores: 4	Cache Size: 8192	Block Size: 16
+  CORE 0
+  accesses:  1734444
+  misses:    294809
+
+  CORE 1
+  accesses:  1734230
+  misses:    316358
+
+  CORE 2
+  accesses:  1734209
+  misses:    273634
+
+  CORE 3
+  accesses:  1734225
+  misses:    271411
+
+  demand fetch (words): 4624848
+  broadcasts:           1736479
+  copies back (words):  3390312
+
+
+Number of Cores: 8	Cache Size: 8192	Block Size: 16
+  CORE 0
+  accesses:  869616
+  misses:    285047
+
+  CORE 1
+  accesses:  869343
+  misses:    287972
+
+  CORE 2
+  accesses:  869385
+  misses:    298687
+
+  CORE 3
+  accesses:  869504
+  misses:    278884
+
+  CORE 4
+  accesses:  869336
+  misses:    270172
+
+  CORE 5
+  accesses:  869326
+  misses:    264075
+
+  CORE 6
+  accesses:  869335
+  misses:    308474
+
+  CORE 7
+  accesses:  869300
+  misses:    299313
+
+  demand fetch (words): 9170496
+  broadcasts:           3536652
+  copies back (words):  7180320
+
+
+Number of Cores: 2	Cache Size: 16384	Block Size: 16
+  CORE 0
+  accesses:  3465000
+  misses:    260142
+
+  CORE 1
+  accesses:  3464832
+  misses:    260671
+
+  demand fetch (words): 2083252
+  broadcasts:           834958
+  copies back (words):  1715944
+
+
+Number of Cores: 4	Cache Size: 16384	Block Size: 16
+  CORE 0
+  accesses:  1734444
+  misses:    271982
+
+  CORE 1
+  accesses:  1734230
+  misses:    269773
+
+  CORE 2
+  accesses:  1734209
+  misses:    255096
+
+  CORE 3
+  accesses:  1734225
+  misses:    254218
+
+  demand fetch (words): 4204276
+  broadcasts:           1655796
+  copies back (words):  3110452
+
+
+Number of Cores: 2	Cache Size: 16384	Block Size: 32
+  CORE 0
+  accesses:  3465000
+  misses:    241220
+
+  CORE 1
+  accesses:  3464832
+  misses:    175773
+
+  demand fetch (words): 3335944
+  broadcasts:           618627
+  copies back (words):  2569064
+
+
+Number of Cores: 4	Cache Size: 16384	Block Size: 32
+  CORE 0
+  accesses:  1734444
+  misses:    189122
+
+  CORE 1
+  accesses:  1734230
+  misses:    170033
+
+  CORE 2
+  accesses:  1734209
+  misses:    183025
+
+  CORE 3
+  accesses:  1734225
+  misses:    170742
+
+  demand fetch (words): 5703376
+  broadcasts:           1068118
+  copies back (words):  3639248
+
